@@ -1,4 +1,3 @@
-
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
 #include "HX711.h"
@@ -251,8 +250,8 @@ void drawValue(float mvPerV, float avMvPerV, float promil, float batVoltage) {
 
     //Farbe in Abhängigkeit der Spannung ändern 
   uint16_t batColor = RGB565(250, 250, 0);
-  if (batVoltage < 3.8) batColor = RED;
-  else if (batVoltage > 4) batColor = GREEN;
+  if (batVoltage < 3.6) batColor = RED;
+  else if (batVoltage > 3.7) batColor = GREEN;
   
   gfx2->setTextSize(3, 3);
   gfx2->setCursor(310, 176);
