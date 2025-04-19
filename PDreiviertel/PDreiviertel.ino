@@ -1,3 +1,6 @@
+// Code by Tim Ruegheimer and the PDreiviertel Developtment Team.
+// Special thanks to Maurice for his work
+
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
 #include "HX711.h"
