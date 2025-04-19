@@ -7,6 +7,13 @@
 #define HX711_DT 10
 #define HX711_SCK 11
 
+// --- Pins für Taster ---
+#define BALANCE_PIN 12
+#define CALIBRATE_PIN 13
+
+// --- Pin für Batterie ---
+#define BAT_PIN 4
+
 // --- Display Setup ---
 #define GFX_DEV_DEVICE LILYGO_T_DISPLAY_S3_AMOLED
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(6, 47, 18, 7, 48, 5);
@@ -21,7 +28,7 @@ int currentIndex = 0;          // Aktueller Index für den neuen Wert
 int sum = 0;
 float maxValue = 0.01;
 float calibratedOffset = 26406;  //mv/V -0.002290;
-float calibratedScalingFactor = 0.00000016; 
+float calibratedScalingFactor = 0.00000045938993; //0.00000016
 float blancedOffset = 0;
 
 // --- Farben und Design ---
@@ -37,16 +44,35 @@ float blancedOffset = 0;
 
 
 
+//void calibrateOneProm
+/*
+void balance(float avRawBalanced) {
+ 
+  calibratedScalingFactor = 0.398 /avRawBalanced; 
+ 
+  gfx2->fillScreen(BLACK);
 
+  gfx2->setTextColor(ORANGE);
+  gfx2->setTextSize(8, 8);
+  gfx2->setCursor(50, 80);
+  gfx2->println("Balanced");
+  gfx2->flush();
 
+  while (digitalRead(BOOT_PIN) == LOW) {
+    delay(50);
+  }
+}
 
+*/
 
-
-
+void setBrightness(uint8_t value) {
+  bus->beginWrite();
+  bus->writeC8D8(0x51, value);
+  bus->endWrite();
+}
 
 float calculateMvPerV(long raw) {
-  Serial.print("raw");
-  Serial.println(raw);
+
 
   Serial.print("calibratedScalingFactor ");
     Serial.println(calibratedScalingFactor,20);
@@ -55,13 +81,6 @@ float calculateMvPerV(long raw) {
   
   return mvPerV;
 }
-
-void setBrightness(uint8_t value) {
-  bus->beginWrite();
-  bus->writeC8D8(0x51, value);
-  bus->endWrite();
-}
-
 
 double calculateTrimR(float avMvPerV) {
 
@@ -72,9 +91,57 @@ double calculateTrimR(float avMvPerV) {
   return rTrim;                                           //[kOhm]
 }
 
+float calculatePromil(double TrimR) {
+
+  // --- Widerstandswerte für Promilausgabe ---
+  const float promil[19][2] = {
+        {1740000, 0.2},
+        {874065, 0.4},
+        {582923, 0.6},
+        {437150, 0.8},
+        {349650, 1.0},
+        {291316, 1.2},
+        {218000, 1.6},
+        {194094, 1.8},
+        {145483, 2.4},
+        {109025, 3.2},
+        {96872, 3.6},
+        {72566, 4.8},
+        {54337, 6.4},
+        {48261, 7.2},
+        {36108, 9.6},
+        {26993, 12.8},
+        {23995, 14.4},
+        {17879, 19.2},
+        {11803, 28.8},
+  };
 
 
-void drawValue(float mvPerV, float avMvPerV) {
+  long minDiff = abs((TrimR*1000) - promil[0][0]);
+  float closest = promil[0][1];
+
+  for (int i = 1; i < 19; i++) {
+    long diff = abs((TrimR*1000) - promil[i][0]);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = promil[i][1];
+    }
+  }
+
+  return closest;
+  
+
+}
+
+//Batteriespannung berechnen
+
+float calculateBat(){
+  int rawBat = analogRead(BAT_PIN);
+  float voltage = (rawBat * 1.61) / 1000;
+  return voltage;
+}
+
+void drawValue(float mvPerV, float avMvPerV, float promil, float batVoltage) {
 
 
   char buf[20];
@@ -98,7 +165,7 @@ void drawValue(float mvPerV, float avMvPerV) {
   gfx2->setCursor(20, 40);
   gfx2->print(firstPart);
 
-  // Den letzten Teil in Grau ausgeben
+  // Den letzten Teil in GrünGrau ausgeben
   uint16_t green = RGB565(0, 160, 0);
   gfx2->setTextColor(green);
   gfx2->print(lastPart);
@@ -155,50 +222,57 @@ void drawValue(float mvPerV, float avMvPerV) {
     gfx2->print("kOhm ");
   }
 
+  //Promille Ausgabe
+  gfx2->setTextSize(2, 2);
+  gfx2->setTextColor(WHITE);
+  gfx2->setCursor(215, 140);
+  gfx2->print("Promil");
+
+  uint16_t promilColor = RGB565(250, 0, 250);
+  gfx2->setTextSize(3, 3);
+  gfx2->setTextColor(promilColor);
+  gfx2->setCursor(310, 136);
+  snprintf(buf, sizeof(buf), "%*.*f", 3, 1, promil);
+  gfx2->print(buf);
+  
+  gfx2->setCursor(420, 136);
+  gfx2->setTextColor(promilColor);
+  gfx2->print("% ");
+
+  gfx2->setCursor(430, 136);
+  gfx2->setTextColor(promilColor);
+  gfx2->print(". ");
+
+  //Batteriespannung ausgabe 
+  gfx2->setTextSize(2, 2);
+  gfx2->setTextColor(WHITE);
+  gfx2->setCursor(93, 180);
+  gfx2->print("Batteriespannung");
+
+    //Farbe in Abhängigkeit der Spannung ändern 
+  uint16_t batColor = RGB565(250, 250, 0);
+  if (batVoltage < 3.8) batColor = RED;
+  else if (batVoltage > 4) batColor = GREEN;
+  
+  gfx2->setTextSize(3, 3);
+  gfx2->setCursor(310, 176);
+  gfx2->setTextColor(batColor);
+  snprintf(buf, sizeof(buf), "%*.*f", 2, 2, batVoltage);
+  gfx2->print(buf);
+
+  gfx2->setCursor(420, 176);
+  gfx2->setTextColor(batColor);
+  gfx2->print("V ");
+
 
 
   gfx2->flush();
 }
-
-void balance(float avMvPerV) {
-  blancedOffset = avMvPerV;
-  maxValue = 0.01;
-
-  gfx2->fillScreen(BLACK);
-
-  gfx2->setTextColor(ORANGE);
-  gfx2->setTextSize(8, 8);
-  gfx2->setCursor(50, 80);
-  gfx2->println("Balanced");
-  gfx2->flush();
-
-  while (digitalRead(BOOT_PIN) == LOW) {
-    delay(50);
-  }
-}
-
-//void calibrateOneProm
-/*
-void balance(float avRawBalanced) {
- 
-  calibratedScalingFactor = 0.398 /avRawBalanced; 
- 
-  gfx2->fillScreen(BLACK);
-
-  gfx2->setTextColor(ORANGE);
-  gfx2->setTextSize(8, 8);
-  gfx2->setCursor(50, 80);
-  gfx2->println("Balanced");
-  gfx2->flush();
-
-  while (digitalRead(BOOT_PIN) == LOW) {
-    delay(50);
-  }
-}
-
-*/
 
 void setup() {
+  //Batterie definieren
+  pinMode(BAT_PIN, INPUT);
+
   // Touch-Version: Display aktivieren
   pinMode(38, OUTPUT);
   digitalWrite(38, HIGH);
@@ -206,7 +280,7 @@ void setup() {
 
 
   Serial.begin(115200);
-  delay(1000);
+  //delay(1000);
 
   for (int i = 0; i < movingAvgSize; i++) {
     values[i] = 0;
@@ -223,6 +297,8 @@ void setup() {
 
   setBrightness(150);
 
+  // Bootup Logo
+
   // HX711 Setup
   scale.begin(HX711_DT, HX711_SCK);
   scale.set_gain(128);  // Verstärkung: 128, 64 oder 32
@@ -233,13 +309,13 @@ void setup() {
   } else {
     Serial.println("HX711 bereit.");
   }
+
+  //Taster  
+  pinMode(BALANCE_PIN, INPUT_PULLUP);
 }
 
 
 void loop() {
-
-
-
 
   if (scale.is_ready()) {
     long raw = scale.read();
@@ -253,23 +329,34 @@ void loop() {
     }
 
     long avRaw = sum / movingAvgSize;
+    
+    Serial.print("avRaw");
+    Serial.println(avRaw);
 
 
     float mvPerV = calculateMvPerV(raw - calibratedOffset - blancedOffset);
     float avMvPerV = calculateMvPerV(avRaw - calibratedOffset - blancedOffset);
 
+    //Serial.println(avRaw);
+    //Serial.println(avMvPerV);
 
-    if (digitalRead(BOOT_PIN) == LOW) {
+    double TrimR = calculateTrimR(avMvPerV);
+    float promil = calculatePromil(abs(TrimR));
+    float batVoltage = calculateBat();
+   
+
+
+    if (!digitalRead(BALANCE_PIN)) {
       balance(avRaw - calibratedOffset);
     }
 
 
     if (maxValue / 2 < abs(avMvPerV)) {  //2 wegen beiden Bereichen Positiv und Negativ
       maxValue = abs(avMvPerV) * 2;
-      Serial.println("!!!!!!!!!!!!!!!!!!!!!!!!!update");
+      Serial.println("updateMaxVal");
     }
 
-    drawValue(mvPerV, avMvPerV);
+    drawValue(mvPerV, avMvPerV, promil, batVoltage);
     // Serial.printf("Raw: %ld -> %.6f mV/V\n", raw, mvPerV);
   }
 
