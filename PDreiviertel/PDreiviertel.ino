@@ -1,5 +1,3 @@
-// Code by Tim Ruegheimer and the PDreiviertel Developtment Team.
-// Special thanks to Maurice for his work
 
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
@@ -13,7 +11,7 @@
 #define BALANCE_PIN 12
 #define CALIBRATE_PIN 13
 
-// --- Pin für Batterie ---
+// --- Pin für ADC der Batterie ---
 #define BAT_PIN 4
 
 // --- Display Setup ---
@@ -24,13 +22,13 @@ Arduino_GFX *gfx2;
 
 HX711 scale;
 
-const int movingAvgSize = 15;  // Anzahl der Werte im Moving Average Filter
+const int movingAvgSize = 50;  // Anzahl der Werte im Moving Average Filter
 long values[movingAvgSize];    // Array für die letzten 15 Messwerte
 int currentIndex = 0;          // Aktueller Index für den neuen Wert
 int sum = 0;
 float maxValue = 0.01;
-float calibratedOffset = 26406;  //mv/V -0.002290;
-float calibratedScalingFactor = 0.00000045938993; //0.00000016
+float calibratedOffset = 2638;  //mv/V -0.002290;
+float calibratedScalingFactor = 0.00000045855; //0.00000016
 float blancedOffset = 0;
 
 // --- Farben und Design ---
@@ -249,12 +247,12 @@ void drawValue(float mvPerV, float avMvPerV, float promil, float batVoltage) {
   gfx2->setTextSize(2, 2);
   gfx2->setTextColor(WHITE);
   gfx2->setCursor(93, 180);
-  gfx2->print("Batteriespannung");
+  gfx2->print("BatVoltage");
 
     //Farbe in Abhängigkeit der Spannung ändern 
   uint16_t batColor = RGB565(250, 250, 0);
-  if (batVoltage < 3.6) batColor = RED;
-  else if (batVoltage > 3.7) batColor = GREEN;
+  if (batVoltage < 3.8) batColor = RED;
+  else if (batVoltage > 4) batColor = GREEN;
   
   gfx2->setTextSize(3, 3);
   gfx2->setCursor(310, 176);
