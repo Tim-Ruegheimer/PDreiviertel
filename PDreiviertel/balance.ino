@@ -7,7 +7,7 @@ void balance(float avMvPerV) {
   gfx2->setTextColor(ORANGE);
   gfx2->setTextSize(8, 8);
   gfx2->setCursor(50, 80);
-  gfx2->println("Balanced");
+  gfx2->println("BALANCED");
   gfx2->flush();
 
   while (digitalRead(BALANCE_PIN) == LOW) {
