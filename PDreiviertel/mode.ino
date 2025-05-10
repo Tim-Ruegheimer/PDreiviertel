@@ -12,7 +12,7 @@ void mode() {
 
   int i = 0;
   while (digitalRead(MODE_PIN) == LOW) {
-    delay(50);
+    delay(25);
     i++;
     if(i > 30){
       modeNbr = 1;

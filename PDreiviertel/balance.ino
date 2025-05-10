@@ -1,6 +1,6 @@
 void balance(float avMvPerV) {
   blancedOffset = avMvPerV;
-  maxValue = 0.01;
+  maxValue = 0.0001;
 
   gfx2->fillScreen(BLACK);
 
